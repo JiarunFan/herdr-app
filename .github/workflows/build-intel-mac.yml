@@ -1,0 +1,55 @@
+name: Build Intel macOS (x86_64 / macOS 12+)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - intel-mac
+
+permissions:
+  contents: read
+
+env:
+  RUST_TOOLCHAIN: 1.95.0
+  ZIG_VERSION: 0.16.0
+  MACOSX_DEPLOYMENT_TARGET: "12.0"
+
+jobs:
+  build-macos-x86_64:
+    runs-on: macos-15-intel
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: ${{ env.ZIG_VERSION }}
+
+      - name: Build and package Herdr.app (x86_64)
+        run: |
+          uname -a
+          rustc --version
+          zig version
+          scripts/package
+
+      - name: Verify binary arch and minOS
+        run: |
+          tar -xzf dist/herdr-app-macos-x86_64.tar.gz -C /tmp
+          file /tmp/Herdr.app/Contents/MacOS/Herdr
+          otool -l /tmp/Herdr.app/Contents/MacOS/Herdr | grep -A 3 -E "LC_BUILD_VERSION|LC_VERSION_MIN_MACOSX" || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: herdr-app-macos-x86_64
+          path: dist/herdr-app-macos-x86_64.tar.gz
+          retention-days: 30
